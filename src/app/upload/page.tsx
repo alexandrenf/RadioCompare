@@ -167,7 +167,7 @@ export default function UploadPage() {
   }, [annotation]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="border-b p-4">
         <h1 className="text-2xl font-bold">Upload & Annotate</h1>
         <p className="text-sm text-muted-foreground">
@@ -175,13 +175,13 @@ export default function UploadPage() {
         </p>
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 min-h-0 overflow-auto p-4">
         {!previewUrl ? (
           <div className="max-w-2xl mx-auto mt-12">
             <ImageDropzone onImageSelect={handleImageSelect} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 h-full">
+          <div className="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
             {/* Canvas area */}
             <div className="flex flex-col gap-3 min-h-0">
               <Toolbar

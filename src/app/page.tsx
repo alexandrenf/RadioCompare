@@ -15,7 +15,7 @@ export default function DashboardPage() {
   const recentStudies = studies?.slice(0, 4);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="border-b p-4">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
@@ -23,7 +23,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 space-y-8">
+      <div className="flex-1 min-h-0 overflow-auto p-4 space-y-8">
         {/* Quick actions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link href="/upload">

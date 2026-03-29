@@ -39,11 +39,6 @@ function normalizePath(path: string) {
   return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
-function withTrailingSlash(path: string) {
-  if (path === "/") return "/";
-  return `${normalizePath(path)}/`;
-}
-
 export function AppSidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -68,7 +63,7 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      render={<Link href={withTrailingSlash(item.href)} />}
+                      render={<Link href={item.href} />}
                       isActive={
                         itemPath === "/"
                           ? normalizedPathname === "/"

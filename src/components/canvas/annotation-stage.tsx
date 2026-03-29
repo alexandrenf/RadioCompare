@@ -6,6 +6,20 @@ import useImage from "use-image";
 import type { Annotation, AnnotationLine, AnnotationText, ToolType } from "@/types";
 import type Konva from "konva";
 
+const HIGHLIGHTER_WIDTH_MULTIPLIER = 1.5;
+const HIGHLIGHTER_MIN_WIDTH = 6;
+
+function getRenderedStrokeWidth(tool: ToolType, strokeWidth: number) {
+  if (tool !== "highlighter") {
+    return strokeWidth;
+  }
+
+  return Math.max(
+    Math.round(strokeWidth * HIGHLIGHTER_WIDTH_MULTIPLIER),
+    HIGHLIGHTER_MIN_WIDTH
+  );
+}
+
 interface AnnotationStageProps {
   imageUrl: string;
   annotations: Annotation[];
@@ -40,56 +54,48 @@ export function AnnotationStage({
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textInputPos, setTextInputPos] = useState({ x: 0, y: 0 });
   const [textInputValue, setTextInputValue] = useState("");
 
-  // Fit image to container
-  useEffect(() => {
+  const updateStageDimensions = useCallback(() => {
     if (!image || !containerRef.current) return;
-    const container = containerRef.current;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    const imageAspect = image.width / image.height;
-    const containerAspect = containerWidth / containerHeight;
 
-    let newWidth, newHeight;
-    if (imageAspect > containerAspect) {
-      newWidth = containerWidth;
-      newHeight = containerWidth / imageAspect;
-    } else {
-      newHeight = containerHeight;
-      newWidth = containerHeight * imageAspect;
-    }
-    setStageSize({ width: newWidth, height: newHeight });
-    setScale(newWidth / image.width);
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
+    if (containerWidth <= 0 || containerHeight <= 0) return;
+
+    const nextScale = Math.min(
+      containerWidth / image.width,
+      containerHeight / image.height
+    );
+    if (!Number.isFinite(nextScale) || nextScale <= 0) return;
+
+    const nextWidth = Math.max(1, Math.round(image.width * nextScale));
+    const nextHeight = Math.max(1, Math.round(image.height * nextScale));
+
+    setStageSize((prev) =>
+      prev.width === nextWidth && prev.height === nextHeight
+        ? prev
+        : { width: nextWidth, height: nextHeight }
+    );
+    setScale((prev) =>
+      Math.abs(prev - nextScale) < 0.001 ? prev : nextScale
+    );
   }, [image]);
 
-  // Resize observer
   useEffect(() => {
     if (!containerRef.current) return;
+
+    updateStageDimensions();
+
     const observer = new ResizeObserver(() => {
-      if (image && containerRef.current) {
-        const container = containerRef.current;
-        const containerWidth = container.clientWidth;
-        const containerHeight = container.clientHeight;
-        const imageAspect = image.width / image.height;
-        const containerAspect = containerWidth / containerHeight;
-        let newWidth, newHeight;
-        if (imageAspect > containerAspect) {
-          newWidth = containerWidth;
-          newHeight = containerWidth / imageAspect;
-        } else {
-          newHeight = containerHeight;
-          newWidth = containerHeight * imageAspect;
-        }
-        setStageSize({ width: newWidth, height: newHeight });
-        setScale(newWidth / image.width);
-      }
+      updateStageDimensions();
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [image]);
+  }, [updateStageDimensions]);
 
   const getRelativePointerPosition = useCallback(() => {
     const stage = stageRef.current;
@@ -99,41 +105,68 @@ export function AnnotationStage({
     return { x: pos.x / scale, y: pos.y / scale };
   }, [scale]);
 
+  useEffect(() => {
+    if (!editingTextId || !textInputRef.current) return;
+
+    const frame = requestAnimationFrame(() => {
+      const input = textInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [editingTextId]);
+
+  const startTextEditing = useCallback(
+    (position: { x: number; y: number }, value = "", id: string | null = "new") => {
+      setTextInputPos(position);
+      setTextInputValue(value);
+      setEditingTextId(id);
+    },
+    []
+  );
+
   const handleMouseDown = useCallback(() => {
-    if (readOnly) return;
+    if (readOnly || editingTextId) return;
     const pos = getRelativePointerPosition();
     if (!pos) return;
 
     if (activeTool === "pen" || activeTool === "highlighter") {
       setIsDrawing(true);
       setCurrentLine([pos.x, pos.y]);
-    } else if (activeTool === "text") {
+    }
+  }, [activeTool, editingTextId, readOnly, getRelativePointerPosition]);
+
+  const handleClick = useCallback(() => {
+    if (readOnly || editingTextId) return;
+
+    if (activeTool === "text") {
       const stage = stageRef.current;
       if (!stage) return;
       const stagePos = stage.getPointerPosition();
       if (!stagePos) return;
 
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      if (!containerRect) return;
-
-      setTextInputPos({
-        x: containerRect.left + stagePos.x,
-        y: containerRect.top + stagePos.y,
+      startTextEditing({
+        x: stagePos.x,
+        y: stagePos.y,
       });
-      setTextInputValue("");
-      setEditingTextId("new");
-    } else if (activeTool === "eraser") {
+      return;
+    }
+
+    if (activeTool === "eraser") {
       const stage = stageRef.current;
       if (!stage) return;
-      const clickedShape = stage.getIntersection(
-        stage.getPointerPosition()!
-      );
+      const pointerPosition = stage.getPointerPosition();
+      if (!pointerPosition) return;
+
+      const clickedShape = stage.getIntersection(pointerPosition);
       if (clickedShape) {
         const id = clickedShape.id();
         if (id) onRemoveAnnotation(id);
       }
     }
-  }, [activeTool, readOnly, getRelativePointerPosition, onRemoveAnnotation]);
+  }, [activeTool, editingTextId, readOnly, onRemoveAnnotation, startTextEditing]);
 
   const handleMouseMove = useCallback(() => {
     if (!isDrawing || readOnly) return;
@@ -155,8 +188,7 @@ export function AnnotationStage({
       tool: activeTool as "pen" | "highlighter",
       points: currentLine,
       strokeColor: strokeColor,
-      strokeWidth:
-        activeTool === "highlighter" ? Math.max(strokeWidth * 4, 20) : strokeWidth,
+      strokeWidth: getRenderedStrokeWidth(activeTool, strokeWidth),
       opacity: activeTool === "highlighter" ? 0.4 : 1,
     };
     onAddAnnotation(annotation);
@@ -173,25 +205,16 @@ export function AnnotationStage({
 
   const handleTextSubmit = useCallback(() => {
     if (textInputValue.trim() && editingTextId) {
-      const pos = getRelativePointerPosition();
       if (editingTextId === "new") {
-        const stage = stageRef.current;
-        const stagePos = stage?.getPointerPosition();
         const annotation: AnnotationText = {
           id: crypto.randomUUID(),
           tool: "text",
           text: textInputValue.trim(),
-          x: stagePos ? stagePos.x / scale : 0,
-          y: stagePos ? stagePos.y / scale : 0,
+          x: textInputPos.x / scale,
+          y: textInputPos.y / scale,
           fontSize,
           fontColor,
         };
-        // Use the textInputPos to calculate relative position
-        const containerRect = containerRef.current?.getBoundingClientRect();
-        if (containerRect) {
-          annotation.x = (textInputPos.x - containerRect.left) / scale;
-          annotation.y = (textInputPos.y - containerRect.top) / scale;
-        }
         onAddAnnotation(annotation);
       } else {
         onUpdateAnnotation(editingTextId, { text: textInputValue.trim() } as Partial<AnnotationText>);
@@ -208,131 +231,181 @@ export function AnnotationStage({
     textInputPos,
     onAddAnnotation,
     onUpdateAnnotation,
-    getRelativePointerPosition,
   ]);
+
+  const handleTextNodeClick = useCallback(
+    (
+      event: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
+      id: string,
+      text: string,
+      x: number,
+      y: number
+    ) => {
+      if (readOnly || activeTool !== "text") return;
+      event.cancelBubble = true;
+      startTextEditing(
+        {
+          x: x * scale,
+          y: y * scale,
+        },
+        text,
+        id
+      );
+    },
+    [activeTool, readOnly, scale, startTextEditing]
+  );
 
   const handleTextDblClick = useCallback(
     (id: string, text: string, x: number, y: number) => {
       if (readOnly) return;
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      if (!containerRect) return;
-      setEditingTextId(id);
-      setTextInputValue(text);
-      setTextInputPos({
-        x: containerRect.left + x * scale,
-        y: containerRect.top + y * scale,
-      });
+      startTextEditing(
+        {
+          x: x * scale,
+          y: y * scale,
+        },
+        text,
+        id
+      );
     },
-    [readOnly, scale]
+    [readOnly, scale, startTextEditing]
   );
 
   return (
-    <div ref={containerRef} className="relative w-full h-full min-h-[400px]">
-      <Stage
-        ref={stageRef}
-        width={stageSize.width}
-        height={stageSize.height}
-        scaleX={scale}
-        scaleY={scale}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
-        className="border border-border rounded-md bg-black"
-      >
-        {/* Image Layer */}
-        <Layer>
-          {image && (
-            <KonvaImage image={image} width={image.width} height={image.height} />
-          )}
-        </Layer>
+    <div
+      ref={containerRef}
+      className="relative h-full min-h-[400px] w-full overflow-hidden"
+    >
+      <div className="absolute inset-0">
+        <Stage
+          ref={stageRef}
+          width={stageSize.width}
+          height={stageSize.height}
+          scaleX={scale}
+          scaleY={scale}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onClick={handleClick}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
+          onTap={handleClick}
+          className="rounded-md border border-border bg-black"
+        >
+          {/* Image Layer */}
+          <Layer>
+            {image && (
+              <KonvaImage image={image} width={image.width} height={image.height} />
+            )}
+          </Layer>
 
-        {/* Annotation Layer */}
-        <Layer>
-          {annotations.map((ann) => {
-            if (ann.tool === "pen" || ann.tool === "highlighter") {
-              const lineAnn = ann as AnnotationLine;
-              return (
-                <Line
-                  key={lineAnn.id}
-                  id={lineAnn.id}
-                  points={lineAnn.points}
-                  stroke={lineAnn.strokeColor}
-                  strokeWidth={lineAnn.strokeWidth}
-                  opacity={lineAnn.opacity}
-                  tension={0.5}
-                  lineCap="round"
-                  lineJoin="round"
-                  globalCompositeOperation={
-                    lineAnn.tool === "highlighter"
-                      ? "multiply"
-                      : "source-over"
-                  }
-                />
-              );
-            }
-            if (ann.tool === "text") {
-              const textAnn = ann as AnnotationText;
-              return (
-                <Text
-                  key={textAnn.id}
-                  id={textAnn.id}
-                  x={textAnn.x}
-                  y={textAnn.y}
-                  text={textAnn.text}
-                  fontSize={textAnn.fontSize}
-                  fill={textAnn.fontColor}
-                  draggable={!readOnly}
-                  onDblClick={() =>
-                    handleTextDblClick(
-                      textAnn.id,
-                      textAnn.text,
-                      textAnn.x,
-                      textAnn.y
-                    )
-                  }
-                  onDragEnd={(e) => {
-                    if (!readOnly) {
-                      onUpdateAnnotation(textAnn.id, {
-                        x: e.target.x(),
-                        y: e.target.y(),
-                      } as Partial<AnnotationText>);
+          {/* Annotation Layer */}
+          <Layer>
+            {annotations.map((ann) => {
+              if (ann.tool === "pen" || ann.tool === "highlighter") {
+                const lineAnn = ann as AnnotationLine;
+                return (
+                  <Line
+                    key={lineAnn.id}
+                    id={lineAnn.id}
+                    points={lineAnn.points}
+                    stroke={lineAnn.strokeColor}
+                    strokeWidth={lineAnn.strokeWidth}
+                    opacity={lineAnn.opacity}
+                    tension={0.5}
+                    lineCap="round"
+                    lineJoin="round"
+                    globalCompositeOperation={
+                      lineAnn.tool === "highlighter"
+                        ? "multiply"
+                        : "source-over"
                     }
-                  }}
-                />
-              );
-            }
-            return null;
-          })}
+                  />
+                );
+              }
+              if (ann.tool === "text") {
+                const textAnn = ann as AnnotationText;
+                return (
+                  <Text
+                    key={textAnn.id}
+                    id={textAnn.id}
+                    x={textAnn.x}
+                    y={textAnn.y}
+                    text={textAnn.text}
+                    fontSize={textAnn.fontSize}
+                    fill={textAnn.fontColor}
+                    draggable={!readOnly}
+                    onClick={(event) =>
+                      handleTextNodeClick(
+                        event,
+                        textAnn.id,
+                        textAnn.text,
+                        textAnn.x,
+                        textAnn.y
+                      )
+                    }
+                    onTap={(event) =>
+                      handleTextNodeClick(
+                        event,
+                        textAnn.id,
+                        textAnn.text,
+                        textAnn.x,
+                        textAnn.y
+                      )
+                    }
+                    onDblClick={() =>
+                      handleTextDblClick(
+                        textAnn.id,
+                        textAnn.text,
+                        textAnn.x,
+                        textAnn.y
+                      )
+                    }
+                    onDblTap={() =>
+                      handleTextDblClick(
+                        textAnn.id,
+                        textAnn.text,
+                        textAnn.x,
+                        textAnn.y
+                      )
+                    }
+                    onDragEnd={(e) => {
+                      if (!readOnly) {
+                        onUpdateAnnotation(textAnn.id, {
+                          x: e.target.x(),
+                          y: e.target.y(),
+                        } as Partial<AnnotationText>);
+                      }
+                    }}
+                  />
+                );
+              }
+              return null;
+            })}
 
-          {/* Current drawing line */}
-          {isDrawing && currentLine.length >= 2 && (
-            <Line
-              points={currentLine}
-              stroke={strokeColor}
-              strokeWidth={
-                activeTool === "highlighter"
-                  ? Math.max(strokeWidth * 4, 20)
-                  : strokeWidth
-              }
-              opacity={activeTool === "highlighter" ? 0.4 : 1}
-              tension={0.5}
-              lineCap="round"
-              lineJoin="round"
-              globalCompositeOperation={
-                activeTool === "highlighter" ? "multiply" : "source-over"
-              }
-            />
-          )}
-        </Layer>
-      </Stage>
+            {/* Current drawing line */}
+            {isDrawing && currentLine.length >= 2 && (
+              <Line
+                points={currentLine}
+                stroke={strokeColor}
+                strokeWidth={getRenderedStrokeWidth(activeTool, strokeWidth)}
+                opacity={activeTool === "highlighter" ? 0.4 : 1}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                globalCompositeOperation={
+                  activeTool === "highlighter" ? "multiply" : "source-over"
+                }
+              />
+            )}
+          </Layer>
+        </Stage>
+      </div>
 
       {/* Text input overlay */}
       {editingTextId && (
         <textarea
-          autoFocus
+          ref={textInputRef}
           value={textInputValue}
           onChange={(e) => setTextInputValue(e.target.value)}
           onBlur={handleTextSubmit}
@@ -346,7 +419,7 @@ export function AnnotationStage({
               setTextInputValue("");
             }
           }}
-          className="fixed z-50 bg-transparent border border-white/50 text-white outline-none resize-none p-1 min-w-[100px]"
+          className="absolute z-10 min-h-[2.5rem] min-w-[140px] resize-none rounded-sm border border-white/60 bg-black/70 p-1 text-white outline-none"
           style={{
             left: textInputPos.x,
             top: textInputPos.y,

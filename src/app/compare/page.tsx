@@ -98,7 +98,7 @@ export default function ComparePage() {
     rightType === "study" ? studies : normals;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="border-b p-4">
         <h1 className="text-2xl font-bold">Compare</h1>
         <p className="text-sm text-muted-foreground">
@@ -106,7 +106,7 @@ export default function ComparePage() {
         </p>
       </div>
 
-      <div className="flex-1 p-4 flex flex-col gap-4 min-h-0">
+      <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-auto p-4">
         {/* Controls */}
         <div className="grid grid-cols-2 gap-8">
           {/* Left panel controls */}

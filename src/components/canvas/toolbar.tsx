@@ -2,7 +2,6 @@
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -19,6 +18,7 @@ import {
   Trash2,
   Palette,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { ToolType } from "@/types";
 
 const COLORS = [
@@ -32,6 +32,11 @@ const COLORS = [
   "#ffffff",
   "#000000",
 ];
+
+const HIGHLIGHTER_MIN_SIZE = 2;
+const HIGHLIGHTER_MAX_SIZE = 12;
+const HIGHLIGHTER_WIDTH_MULTIPLIER = 1.5;
+const HIGHLIGHTER_MIN_RENDERED_WIDTH = 6;
 
 interface ToolbarProps {
   activeTool: ToolType;
@@ -49,6 +54,52 @@ interface ToolbarProps {
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
+}
+
+interface RangeInputProps {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+}
+
+function RangeInput({
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+}: RangeInputProps) {
+  const percentage = max === min ? 0 : ((value - min) / (max - min)) * 100;
+
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(event) => onChange(Number(event.target.value))}
+      className={cn(
+        "h-2 w-full cursor-pointer appearance-none rounded-full border border-border/60 bg-transparent accent-primary",
+        "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-ring [&::-moz-range-thumb]:bg-background [&::-moz-range-thumb]:shadow-sm",
+        "[&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full",
+        "[&::-webkit-slider-thumb]:-mt-1 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-ring [&::-webkit-slider-thumb]:bg-background [&::-webkit-slider-thumb]:shadow-sm"
+      )}
+      style={{
+        background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${percentage}%, var(--muted) ${percentage}%, var(--muted) 100%)`,
+      }}
+    />
+  );
+}
+
+function getHighlighterWidthLabel(strokeWidth: number) {
+  return Math.max(
+    Math.round(strokeWidth * HIGHLIGHTER_WIDTH_MULTIPLIER),
+    HIGHLIGHTER_MIN_RENDERED_WIDTH
+  );
 }
 
 export function Toolbar({
@@ -168,29 +219,27 @@ export function Toolbar({
             {activeTool === "text" ? (
               <>
                 <Label className="text-xs">Font Size: {fontSize}px</Label>
-                <Slider
-                  value={[fontSize]}
-                  onValueChange={(_val, _e) => {
-                    if (Array.isArray(_val)) onFontSizeChange(_val[0]);
-                  }}
+                <RangeInput
+                  value={fontSize}
                   min={10}
                   max={48}
                   step={1}
+                  onChange={onFontSizeChange}
                 />
               </>
             ) : (
               <>
                 <Label className="text-xs">
-                  Stroke Width: {strokeWidth}px
+                  {activeTool === "highlighter"
+                    ? `Highlighter Width: ${getHighlighterWidthLabel(strokeWidth)}px`
+                    : `Stroke Width: ${strokeWidth}px`}
                 </Label>
-                <Slider
-                  value={[strokeWidth]}
-                  onValueChange={(_val, _e) => {
-                    if (Array.isArray(_val)) onStrokeWidthChange(_val[0]);
-                  }}
-                  min={1}
-                  max={20}
+                <RangeInput
+                  value={strokeWidth}
+                  min={activeTool === "highlighter" ? HIGHLIGHTER_MIN_SIZE : 1}
+                  max={activeTool === "highlighter" ? HIGHLIGHTER_MAX_SIZE : 20}
                   step={1}
+                  onChange={onStrokeWidthChange}
                 />
               </>
             )}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatDisplayDate } from "@/lib/format-date";
 import type { Modality } from "@/types";
 
 interface StudyCardProps {
@@ -64,7 +65,7 @@ export function StudyCard({
               )}
             </div>
             <span className="text-xs text-muted-foreground">
-              {new Date(createdAt).toLocaleDateString()}
+              {formatDisplayDate(createdAt)}
             </span>
           </div>
         </CardContent>

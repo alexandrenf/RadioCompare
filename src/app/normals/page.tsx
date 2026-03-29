@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImageDropzone } from "@/components/upload/dropzone";
+import { formatDisplayDate } from "@/lib/format-date";
 import { Plus, Search, ScanLine, Trash2, Loader2 } from "lucide-react";
 
 const BODY_REGIONS = [
@@ -141,7 +142,7 @@ export default function NormalsPage() {
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="border-b p-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Normal Scans</h1>
@@ -316,7 +317,7 @@ export default function NormalsPage() {
                   )}
                   <div className="flex justify-between items-center mt-2">
                     <span className="text-xs text-muted-foreground">
-                      {new Date(normal.createdAt).toLocaleDateString()}
+                      {formatDisplayDate(normal.createdAt)}
                     </span>
                     <Button
                       variant="ghost"

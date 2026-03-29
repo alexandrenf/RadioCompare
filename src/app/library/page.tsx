@@ -30,7 +30,7 @@ export default function LibraryPage() {
   const studies = isSearching ? searchResults : listResults;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="border-b p-4">
         <h1 className="text-2xl font-bold">My Library</h1>
         <p className="text-sm text-muted-foreground">
@@ -38,7 +38,7 @@ export default function LibraryPage() {
         </p>
       </div>
 
-      <div className="p-4 space-y-4 flex-1">
+      <div className="flex-1 min-h-0 space-y-4 overflow-auto p-4">
         <SearchBar
           query={query}
           modality={modality}
