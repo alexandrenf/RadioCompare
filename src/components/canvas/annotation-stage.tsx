@@ -1,9 +1,21 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { Stage, Layer, Line, Text, Image as KonvaImage } from "react-konva";
+import {
+  Stage,
+  Layer,
+  Line,
+  Text,
+  Transformer,
+  Image as KonvaImage,
+} from "react-konva";
 import useImage from "use-image";
-import type { Annotation, AnnotationLine, AnnotationText, ToolType } from "@/types";
+import type {
+  Annotation,
+  AnnotationLine,
+  AnnotationText,
+  ToolType,
+} from "@/types";
 import type Konva from "konva";
 
 const HIGHLIGHTER_WIDTH_MULTIPLIER = 1.5;
@@ -49,15 +61,26 @@ export function AnnotationStage({
 }: AnnotationStageProps) {
   const [image] = useImage(imageUrl, "anonymous");
   const stageRef = useRef<Konva.Stage>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const transformerRef = useRef<Konva.Transformer>(null);
+  const textNodeRefs = useRef<Record<string, Konva.Text | null>>({});
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentLine, setCurrentLine] = useState<number[]>([]);
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
   const [scale, setScale] = useState(1);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [textInputPos, setTextInputPos] = useState({ x: 0, y: 0 });
   const [textInputValue, setTextInputValue] = useState("");
+
+  const editingTextAnnotation =
+    editingTextId && editingTextId !== "new"
+      ? annotations.find(
+          (annotation): annotation is AnnotationText =>
+            annotation.tool === "text" && annotation.id === editingTextId
+        ) ?? null
+      : null;
 
   const updateStageDimensions = useCallback(() => {
     if (!image || !containerRef.current) return;
@@ -94,14 +117,17 @@ export function AnnotationStage({
       updateStageDimensions();
     });
     observer.observe(containerRef.current);
+
     return () => observer.disconnect();
   }, [updateStageDimensions]);
 
   const getRelativePointerPosition = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return null;
+
     const pos = stage.getPointerPosition();
     if (!pos) return null;
+
     return { x: pos.x / scale, y: pos.y / scale };
   }, [scale]);
 
@@ -111,6 +137,7 @@ export function AnnotationStage({
     const frame = requestAnimationFrame(() => {
       const input = textInputRef.current;
       if (!input) return;
+
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     });
@@ -118,66 +145,139 @@ export function AnnotationStage({
     return () => cancelAnimationFrame(frame);
   }, [editingTextId]);
 
+  useEffect(() => {
+    if (activeTool !== "text") {
+      setSelectedTextId(null);
+    }
+  }, [activeTool]);
+
+  useEffect(() => {
+    if (!selectedTextId) return;
+
+    const annotationExists = annotations.some(
+      (annotation) => annotation.tool === "text" && annotation.id === selectedTextId
+    );
+    if (!annotationExists) {
+      setSelectedTextId(null);
+    }
+  }, [annotations, selectedTextId]);
+
+  useEffect(() => {
+    const transformer = transformerRef.current;
+    if (!transformer) return;
+
+    const selectedNode =
+      activeTool === "text" && !editingTextId && selectedTextId
+        ? textNodeRefs.current[selectedTextId] ?? null
+        : null;
+
+    transformer.nodes(selectedNode ? [selectedNode] : []);
+    transformer.getLayer()?.batchDraw();
+  }, [activeTool, annotations, editingTextId, selectedTextId]);
+
   const startTextEditing = useCallback(
     (position: { x: number; y: number }, value = "", id: string | null = "new") => {
       setTextInputPos(position);
       setTextInputValue(value);
       setEditingTextId(id);
+      setSelectedTextId(id === "new" ? null : id);
     },
     []
   );
 
+  const cancelTextEditing = useCallback(() => {
+    if (editingTextId && editingTextId !== "new") {
+      setSelectedTextId(editingTextId);
+    }
+    setEditingTextId(null);
+    setTextInputValue("");
+  }, [editingTextId]);
+
   const handleMouseDown = useCallback(() => {
     if (readOnly || editingTextId) return;
+    if (activeTool !== "pen" && activeTool !== "highlighter") return;
+
     const pos = getRelativePointerPosition();
     if (!pos) return;
 
-    if (activeTool === "pen" || activeTool === "highlighter") {
-      setIsDrawing(true);
-      setCurrentLine([pos.x, pos.y]);
-    }
+    setSelectedTextId(null);
+    setIsDrawing(true);
+    setCurrentLine([pos.x, pos.y]);
   }, [activeTool, editingTextId, readOnly, getRelativePointerPosition]);
 
-  const handleClick = useCallback(() => {
-    if (readOnly || editingTextId) return;
+  const handleClick = useCallback(
+    (event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+      if (readOnly || editingTextId) return;
 
-    if (activeTool === "text") {
       const stage = stageRef.current;
       if (!stage) return;
-      const stagePos = stage.getPointerPosition();
-      if (!stagePos) return;
 
-      startTextEditing({
-        x: stagePos.x,
-        y: stagePos.y,
-      });
-      return;
-    }
+      const target = event.target;
+      const isBackgroundTarget =
+        target === stage || target.getClassName() === "Image";
 
-    if (activeTool === "eraser") {
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pointerPosition = stage.getPointerPosition();
-      if (!pointerPosition) return;
+      if (activeTool === "text") {
+        if (!isBackgroundTarget) return;
 
-      const clickedShape = stage.getIntersection(pointerPosition);
-      if (clickedShape) {
-        const id = clickedShape.id();
-        if (id) onRemoveAnnotation(id);
+        if (selectedTextId) {
+          setSelectedTextId(null);
+          return;
+        }
+
+        const stagePos = stage.getPointerPosition();
+        if (!stagePos) return;
+
+        startTextEditing({
+          x: stagePos.x,
+          y: stagePos.y,
+        });
+        return;
       }
-    }
-  }, [activeTool, editingTextId, readOnly, onRemoveAnnotation, startTextEditing]);
+
+      if (activeTool === "eraser") {
+        if (isBackgroundTarget) {
+          setSelectedTextId(null);
+          return;
+        }
+
+        const id = target.id();
+        if (id) {
+          onRemoveAnnotation(id);
+          if (selectedTextId === id) {
+            setSelectedTextId(null);
+          }
+        }
+        return;
+      }
+
+      if (isBackgroundTarget) {
+        setSelectedTextId(null);
+      }
+    },
+    [
+      activeTool,
+      editingTextId,
+      onRemoveAnnotation,
+      readOnly,
+      selectedTextId,
+      startTextEditing,
+    ]
+  );
 
   const handleMouseMove = useCallback(() => {
     if (!isDrawing || readOnly) return;
+
     const pos = getRelativePointerPosition();
     if (!pos) return;
+
     setCurrentLine((prev) => [...prev, pos.x, pos.y]);
   }, [isDrawing, readOnly, getRelativePointerPosition]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDrawing || readOnly) return;
+
     setIsDrawing(false);
+
     if (currentLine.length < 4) {
       setCurrentLine([]);
       return;
@@ -187,53 +287,75 @@ export function AnnotationStage({
       id: crypto.randomUUID(),
       tool: activeTool as "pen" | "highlighter",
       points: currentLine,
-      strokeColor: strokeColor,
+      strokeColor,
       strokeWidth: getRenderedStrokeWidth(activeTool, strokeWidth),
       opacity: activeTool === "highlighter" ? 0.4 : 1,
     };
+
     onAddAnnotation(annotation);
     setCurrentLine([]);
   }, [
-    isDrawing,
-    readOnly,
-    currentLine,
     activeTool,
+    currentLine,
+    isDrawing,
+    onAddAnnotation,
+    readOnly,
     strokeColor,
     strokeWidth,
-    onAddAnnotation,
   ]);
 
   const handleTextSubmit = useCallback(() => {
-    if (textInputValue.trim() && editingTextId) {
+    const trimmedValue = textInputValue.trim();
+
+    if (trimmedValue && editingTextId) {
       if (editingTextId === "new") {
+        const annotationId = crypto.randomUUID();
         const annotation: AnnotationText = {
-          id: crypto.randomUUID(),
+          id: annotationId,
           tool: "text",
-          text: textInputValue.trim(),
+          text: trimmedValue,
           x: textInputPos.x / scale,
           y: textInputPos.y / scale,
           fontSize,
           fontColor,
         };
         onAddAnnotation(annotation);
+        setSelectedTextId(annotationId);
       } else {
-        onUpdateAnnotation(editingTextId, { text: textInputValue.trim() } as Partial<AnnotationText>);
+        onUpdateAnnotation(editingTextId, {
+          text: trimmedValue,
+        } as Partial<AnnotationText>);
+        setSelectedTextId(editingTextId);
       }
     }
+
     setEditingTextId(null);
     setTextInputValue("");
   }, [
     editingTextId,
-    textInputValue,
-    fontSize,
     fontColor,
-    scale,
-    textInputPos,
+    fontSize,
     onAddAnnotation,
     onUpdateAnnotation,
+    scale,
+    textInputPos,
+    textInputValue,
   ]);
 
-  const handleTextNodeClick = useCallback(
+  const handleTextNodeSelect = useCallback(
+    (
+      event: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
+      id: string
+    ) => {
+      if (readOnly || activeTool !== "text" || editingTextId) return;
+
+      event.cancelBubble = true;
+      setSelectedTextId(id);
+    },
+    [activeTool, editingTextId, readOnly]
+  );
+
+  const handleTextDblClick = useCallback(
     (
       event: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
       id: string,
@@ -242,6 +364,7 @@ export function AnnotationStage({
       y: number
     ) => {
       if (readOnly || activeTool !== "text") return;
+
       event.cancelBubble = true;
       startTextEditing(
         {
@@ -255,19 +378,39 @@ export function AnnotationStage({
     [activeTool, readOnly, scale, startTextEditing]
   );
 
-  const handleTextDblClick = useCallback(
-    (id: string, text: string, x: number, y: number) => {
-      if (readOnly) return;
-      startTextEditing(
-        {
-          x: x * scale,
-          y: y * scale,
-        },
-        text,
-        id
-      );
+  const handleTextTransformEnd = useCallback(
+    (id: string, node: Konva.Text) => {
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+
+      node.scaleX(1);
+      node.scaleY(1);
+
+      onUpdateAnnotation(id, {
+        x: node.x(),
+        y: node.y(),
+        width: Math.max(60, node.width() * scaleX),
+        fontSize: Math.max(10, node.fontSize() * scaleY),
+      } as Partial<AnnotationText>);
+      setSelectedTextId(id);
     },
-    [readOnly, scale, startTextEditing]
+    [onUpdateAnnotation]
+  );
+
+  const handleTextDragEnd = useCallback(
+    (
+      id: string,
+      event: Konva.KonvaEventObject<DragEvent>
+    ) => {
+      if (readOnly || activeTool !== "text") return;
+
+      onUpdateAnnotation(id, {
+        x: event.target.x(),
+        y: event.target.y(),
+      } as Partial<AnnotationText>);
+      setSelectedTextId(id);
+    },
+    [activeTool, onUpdateAnnotation, readOnly]
   );
 
   return (
@@ -292,98 +435,117 @@ export function AnnotationStage({
           onTap={handleClick}
           className="rounded-md border border-border bg-black"
         >
-          {/* Image Layer */}
           <Layer>
             {image && (
               <KonvaImage image={image} width={image.width} height={image.height} />
             )}
           </Layer>
 
-          {/* Annotation Layer */}
           <Layer>
-            {annotations.map((ann) => {
-              if (ann.tool === "pen" || ann.tool === "highlighter") {
-                const lineAnn = ann as AnnotationLine;
+            {annotations.map((annotation) => {
+              if (annotation.tool === "pen" || annotation.tool === "highlighter") {
+                const lineAnnotation = annotation as AnnotationLine;
+
                 return (
                   <Line
-                    key={lineAnn.id}
-                    id={lineAnn.id}
-                    points={lineAnn.points}
-                    stroke={lineAnn.strokeColor}
-                    strokeWidth={lineAnn.strokeWidth}
-                    opacity={lineAnn.opacity}
+                    key={lineAnnotation.id}
+                    id={lineAnnotation.id}
+                    points={lineAnnotation.points}
+                    stroke={lineAnnotation.strokeColor}
+                    strokeWidth={lineAnnotation.strokeWidth}
+                    opacity={lineAnnotation.opacity}
                     tension={0.5}
                     lineCap="round"
                     lineJoin="round"
                     globalCompositeOperation={
-                      lineAnn.tool === "highlighter"
+                      lineAnnotation.tool === "highlighter"
                         ? "multiply"
                         : "source-over"
                     }
                   />
                 );
               }
-              if (ann.tool === "text") {
-                const textAnn = ann as AnnotationText;
+
+              if (annotation.tool === "text") {
+                const textAnnotation = annotation as AnnotationText;
+
                 return (
                   <Text
-                    key={textAnn.id}
-                    id={textAnn.id}
-                    x={textAnn.x}
-                    y={textAnn.y}
-                    text={textAnn.text}
-                    fontSize={textAnn.fontSize}
-                    fill={textAnn.fontColor}
-                    draggable={!readOnly}
+                    key={textAnnotation.id}
+                    id={textAnnotation.id}
+                    x={textAnnotation.x}
+                    y={textAnnotation.y}
+                    text={textAnnotation.text}
+                    width={textAnnotation.width}
+                    fontSize={textAnnotation.fontSize}
+                    fill={textAnnotation.fontColor}
+                    draggable={!readOnly && activeTool === "text"}
                     onClick={(event) =>
-                      handleTextNodeClick(
-                        event,
-                        textAnn.id,
-                        textAnn.text,
-                        textAnn.x,
-                        textAnn.y
-                      )
+                      handleTextNodeSelect(event, textAnnotation.id)
                     }
                     onTap={(event) =>
-                      handleTextNodeClick(
+                      handleTextNodeSelect(event, textAnnotation.id)
+                    }
+                    onDblClick={(event) =>
+                      handleTextDblClick(
                         event,
-                        textAnn.id,
-                        textAnn.text,
-                        textAnn.x,
-                        textAnn.y
+                        textAnnotation.id,
+                        textAnnotation.text,
+                        textAnnotation.x,
+                        textAnnotation.y
                       )
                     }
-                    onDblClick={() =>
+                    onDblTap={(event) =>
                       handleTextDblClick(
-                        textAnn.id,
-                        textAnn.text,
-                        textAnn.x,
-                        textAnn.y
+                        event,
+                        textAnnotation.id,
+                        textAnnotation.text,
+                        textAnnotation.x,
+                        textAnnotation.y
                       )
                     }
-                    onDblTap={() =>
-                      handleTextDblClick(
-                        textAnn.id,
-                        textAnn.text,
-                        textAnn.x,
-                        textAnn.y
+                    onDragEnd={(event) =>
+                      handleTextDragEnd(textAnnotation.id, event)
+                    }
+                    onTransformEnd={(event) =>
+                      handleTextTransformEnd(
+                        textAnnotation.id,
+                        event.target as Konva.Text
                       )
                     }
-                    onDragEnd={(e) => {
-                      if (!readOnly) {
-                        onUpdateAnnotation(textAnn.id, {
-                          x: e.target.x(),
-                          y: e.target.y(),
-                        } as Partial<AnnotationText>);
-                      }
+                    ref={(node) => {
+                      textNodeRefs.current[textAnnotation.id] = node;
                     }}
                   />
                 );
               }
+
               return null;
             })}
 
-            {/* Current drawing line */}
+            {!readOnly && activeTool === "text" && selectedTextId && !editingTextId && (
+              <Transformer
+                ref={transformerRef}
+                rotateEnabled={false}
+                flipEnabled={false}
+                enabledAnchors={[
+                  "top-left",
+                  "top-right",
+                  "middle-left",
+                  "middle-right",
+                  "bottom-left",
+                  "bottom-right",
+                ]}
+                boundBoxFunc={(oldBox, newBox) => {
+                  if (newBox.width < 60 || newBox.height < 24) {
+                    return oldBox;
+                  }
+
+                  return newBox;
+                }}
+              />
+            )}
+
             {isDrawing && currentLine.length >= 2 && (
               <Line
                 points={currentLine}
@@ -402,29 +564,31 @@ export function AnnotationStage({
         </Stage>
       </div>
 
-      {/* Text input overlay */}
       {editingTextId && (
         <textarea
           ref={textInputRef}
           value={textInputValue}
-          onChange={(e) => setTextInputValue(e.target.value)}
+          onChange={(event) => setTextInputValue(event.target.value)}
           onBlur={handleTextSubmit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
               handleTextSubmit();
             }
-            if (e.key === "Escape") {
-              setEditingTextId(null);
-              setTextInputValue("");
+
+            if (event.key === "Escape") {
+              cancelTextEditing();
             }
           }}
           className="absolute z-10 min-h-[2.5rem] min-w-[140px] resize-none rounded-sm border border-white/60 bg-black/70 p-1 text-white outline-none"
           style={{
             left: textInputPos.x,
             top: textInputPos.y,
-            fontSize: `${fontSize}px`,
-            color: fontColor,
+            width: editingTextAnnotation?.width
+              ? editingTextAnnotation.width * scale
+              : undefined,
+            fontSize: `${editingTextAnnotation?.fontSize ?? fontSize}px`,
+            color: editingTextAnnotation?.fontColor ?? fontColor,
           }}
         />
       )}
@@ -432,7 +596,10 @@ export function AnnotationStage({
   );
 }
 
-export function getStageDataUrl(stageRef: React.RefObject<Konva.Stage | null>): string | null {
+export function getStageDataUrl(
+  stageRef: React.RefObject<Konva.Stage | null>
+): string | null {
   if (!stageRef.current) return null;
+
   return stageRef.current.toDataURL({ pixelRatio: 2 });
 }

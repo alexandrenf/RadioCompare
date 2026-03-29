@@ -19,6 +19,7 @@ export interface AnnotationText {
   y: number;
   fontSize: number;
   fontColor: string;
+  width?: number;
 }
 
 export type Annotation = AnnotationLine | AnnotationText;
