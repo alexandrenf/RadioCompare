@@ -34,9 +34,20 @@ const navItems = [
   { title: "Compare", href: "/compare", icon: Columns2 },
 ];
 
+function normalizePath(path: string) {
+  if (path === "/") return "/";
+  return path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
+function withTrailingSlash(path: string) {
+  if (path === "/") return "/";
+  return `${normalizePath(path)}/`;
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
+  const normalizedPathname = normalizePath(pathname);
 
   return (
     <Sidebar>
@@ -51,21 +62,25 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    render={<Link href={item.href} />}
-                    isActive={
-                      item.href === "/"
-                        ? pathname === "/"
-                        : pathname.startsWith(item.href)
-                    }
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems.map((item) => {
+                const itemPath = normalizePath(item.href);
+
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      render={<Link href={withTrailingSlash(item.href)} />}
+                      isActive={
+                        itemPath === "/"
+                          ? normalizedPathname === "/"
+                          : normalizedPathname.startsWith(itemPath)
+                      }
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
