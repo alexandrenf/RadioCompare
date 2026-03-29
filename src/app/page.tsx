@@ -88,10 +88,8 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Recent Studies</h2>
             {studies && studies.length > 0 && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/library">
-                  View All <ArrowRight className="h-4 w-4 ml-1" />
-                </Link>
+              <Button variant="ghost" size="sm" render={<Link href="/library" />}>
+                View All <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             )}
           </div>
@@ -116,11 +114,9 @@ export default function DashboardPage() {
               <p className="text-muted-foreground">
                 No studies yet. Upload your first image to get started!
               </p>
-              <Button asChild className="mt-4">
-                <Link href="/upload">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Image
-                </Link>
+              <Button render={<Link href="/upload" />} className="mt-4">
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Image
               </Button>
             </Card>
           )}

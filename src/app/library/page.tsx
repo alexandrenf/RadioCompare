@@ -16,15 +16,18 @@ export default function LibraryPage() {
   const [modality, setModality] = useState<Modality | "all">("all");
 
   const modalityFilter = modality === "all" ? undefined : modality;
+  const isSearching = query.trim().length > 0;
 
-  const studies = useQuery(
-    query.trim()
-      ? api.studies.search
-      : api.studies.list,
-    query.trim()
-      ? { query: query.trim(), modality: modalityFilter }
-      : { modality: modalityFilter }
+  const listResults = useQuery(
+    api.studies.list,
+    isSearching ? "skip" : { modality: modalityFilter }
   );
+  const searchResults = useQuery(
+    api.studies.search,
+    isSearching ? { query: query.trim(), modality: modalityFilter } : "skip"
+  );
+
+  const studies = isSearching ? searchResults : listResults;
 
   return (
     <div className="flex flex-col h-full">
@@ -60,8 +63,8 @@ export default function LibraryPage() {
             <p className="text-sm text-muted-foreground mt-1">
               Upload your first radiology image to get started
             </p>
-            <Button asChild className="mt-4">
-              <Link href="/upload">Upload Image</Link>
+            <Button render={<Link href="/upload" />} className="mt-4">
+              Upload Image
             </Button>
           </div>
         ) : (

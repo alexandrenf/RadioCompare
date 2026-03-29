@@ -38,7 +38,7 @@ export function SearchBar({
       </div>
       <Select
         value={modality}
-        onValueChange={(val) => onModalityChange(val as Modality | "all")}
+        onValueChange={(val) => val && onModalityChange(val as Modality | "all")}
       >
         <SelectTrigger className="w-[140px]" aria-label="Filter by modality">
           <SelectValue placeholder="Modality" />

@@ -19,11 +19,6 @@ import {
   Trash2,
   Palette,
 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { ToolType } from "@/types";
 
 const COLORS = [
@@ -77,49 +72,39 @@ export function Toolbar({
     <div className="flex flex-wrap items-center gap-2 p-2 bg-card border border-border rounded-lg">
       {/* Tool selection */}
       <ToggleGroup
-        type="single"
-        value={activeTool}
-        onValueChange={(val) => val && onToolChange(val as ToolType)}
+        value={[activeTool]}
+        onValueChange={(val) => {
+          if (val.length > 0) onToolChange(val[val.length - 1] as ToolType);
+        }}
         aria-label="Drawing tools"
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <ToggleGroupItem value="pen" aria-label="Pen tool (1)">
-              <Pen className="h-4 w-4" />
-            </ToggleGroupItem>
-          </TooltipTrigger>
-          <TooltipContent>Pen (1)</TooltipContent>
-        </Tooltip>
+        <ToggleGroupItem value="pen" aria-label="Pen tool (1)" title="Pen (1)">
+          <Pen className="h-4 w-4" />
+        </ToggleGroupItem>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <ToggleGroupItem
-              value="highlighter"
-              aria-label="Highlighter tool (2)"
-            >
-              <Highlighter className="h-4 w-4" />
-            </ToggleGroupItem>
-          </TooltipTrigger>
-          <TooltipContent>Highlighter (2)</TooltipContent>
-        </Tooltip>
+        <ToggleGroupItem
+          value="highlighter"
+          aria-label="Highlighter tool (2)"
+          title="Highlighter (2)"
+        >
+          <Highlighter className="h-4 w-4" />
+        </ToggleGroupItem>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <ToggleGroupItem value="text" aria-label="Text tool (3)">
-              <Type className="h-4 w-4" />
-            </ToggleGroupItem>
-          </TooltipTrigger>
-          <TooltipContent>Text (3)</TooltipContent>
-        </Tooltip>
+        <ToggleGroupItem
+          value="text"
+          aria-label="Text tool (3)"
+          title="Text (3)"
+        >
+          <Type className="h-4 w-4" />
+        </ToggleGroupItem>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <ToggleGroupItem value="eraser" aria-label="Eraser tool (4)">
-              <Eraser className="h-4 w-4" />
-            </ToggleGroupItem>
-          </TooltipTrigger>
-          <TooltipContent>Eraser (4)</TooltipContent>
-        </Tooltip>
+        <ToggleGroupItem
+          value="eraser"
+          aria-label="Eraser tool (4)"
+          title="Eraser (4)"
+        >
+          <Eraser className="h-4 w-4" />
+        </ToggleGroupItem>
       </ToggleGroup>
 
       {/* Separator */}
@@ -127,17 +112,18 @@ export function Toolbar({
 
       {/* Color picker */}
       <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="icon" aria-label="Pick color">
-            <Palette className="h-4 w-4" />
-            <span
-              className="absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full border border-border"
-              style={{
-                backgroundColor:
-                  activeTool === "text" ? fontColor : strokeColor,
-              }}
-            />
-          </Button>
+        <PopoverTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-muted h-8 w-8 relative"
+          aria-label="Pick color"
+        >
+          <Palette className="h-4 w-4" />
+          <span
+            className="absolute bottom-0.5 right-0.5 h-2 w-2 rounded-full border border-border"
+            style={{
+              backgroundColor:
+                activeTool === "text" ? fontColor : strokeColor,
+            }}
+          />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-3" align="start">
           <div className="space-y-3">
@@ -172,10 +158,10 @@ export function Toolbar({
 
       {/* Size controls */}
       <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="text-xs">
-            Size
-          </Button>
+        <PopoverTrigger
+          className="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-muted h-8 px-2.5 text-xs font-medium"
+        >
+          Size
         </PopoverTrigger>
         <PopoverContent className="w-48 p-3" align="start">
           <div className="space-y-3">
@@ -184,7 +170,9 @@ export function Toolbar({
                 <Label className="text-xs">Font Size: {fontSize}px</Label>
                 <Slider
                   value={[fontSize]}
-                  onValueChange={([val]) => onFontSizeChange(val)}
+                  onValueChange={(_val, _e) => {
+                    if (Array.isArray(_val)) onFontSizeChange(_val[0]);
+                  }}
                   min={10}
                   max={48}
                   step={1}
@@ -197,7 +185,9 @@ export function Toolbar({
                 </Label>
                 <Slider
                   value={[strokeWidth]}
-                  onValueChange={([val]) => onStrokeWidthChange(val)}
+                  onValueChange={(_val, _e) => {
+                    if (Array.isArray(_val)) onStrokeWidthChange(_val[0]);
+                  }}
                   min={1}
                   max={20}
                   step={1}
@@ -212,49 +202,37 @@ export function Toolbar({
       <div className="h-6 w-px bg-border" />
 
       {/* Undo/Redo */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onUndo}
-            disabled={!canUndo}
-            aria-label="Undo"
-          >
-            <Undo2 className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Undo (Ctrl+Z)</TooltipContent>
-      </Tooltip>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onUndo}
+        disabled={!canUndo}
+        aria-label="Undo"
+        title="Undo (Ctrl+Z)"
+      >
+        <Undo2 className="h-4 w-4" />
+      </Button>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onRedo}
-            disabled={!canRedo}
-            aria-label="Redo"
-          >
-            <Redo2 className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Redo (Ctrl+Shift+Z)</TooltipContent>
-      </Tooltip>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onRedo}
+        disabled={!canRedo}
+        aria-label="Redo"
+        title="Redo (Ctrl+Shift+Z)"
+      >
+        <Redo2 className="h-4 w-4" />
+      </Button>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClear}
-            aria-label="Clear all annotations"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Clear All</TooltipContent>
-      </Tooltip>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onClear}
+        aria-label="Clear all annotations"
+        title="Clear All"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

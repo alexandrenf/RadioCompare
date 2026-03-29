@@ -71,15 +71,19 @@ export default function NormalsPage() {
   const [description, setDescription] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  const normals = useQuery(
-    searchQuery.trim() ? api.normals.search : api.normals.list,
-    searchQuery.trim()
-      ? {
-          query: searchQuery.trim(),
-          bodyRegion: regionFilter === "all" ? undefined : regionFilter,
-        }
-      : { bodyRegion: regionFilter === "all" ? undefined : regionFilter }
+  const isSearching = searchQuery.trim().length > 0;
+  const regionParam = regionFilter === "all" ? undefined : regionFilter;
+
+  const listResults = useQuery(
+    api.normals.list,
+    isSearching ? "skip" : { bodyRegion: regionParam }
   );
+  const searchResults = useQuery(
+    api.normals.search,
+    isSearching ? { query: searchQuery.trim(), bodyRegion: regionParam } : "skip"
+  );
+
+  const normals = isSearching ? searchResults : listResults;
 
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
   const createNormal = useMutation(api.normals.create);
@@ -146,11 +150,9 @@ export default function NormalsPage() {
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Normal
-            </Button>
+          <DialogTrigger render={<Button />}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Normal
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
@@ -191,7 +193,7 @@ export default function NormalsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="body-region">Body Region</Label>
-                <Select value={bodyRegion} onValueChange={setBodyRegion}>
+                <Select value={bodyRegion} onValueChange={(v) => v && setBodyRegion(v)}>
                   <SelectTrigger id="body-region">
                     <SelectValue />
                   </SelectTrigger>
@@ -243,7 +245,7 @@ export default function NormalsPage() {
           </div>
           <Select
             value={regionFilter}
-            onValueChange={setRegionFilter}
+            onValueChange={(v) => v && setRegionFilter(v)}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Body Region" />

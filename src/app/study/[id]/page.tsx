@@ -142,8 +142,8 @@ export default function StudyPage({
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <p className="text-lg">Study not found</p>
-        <Button asChild className="mt-4">
-          <Link href="/library">Back to Library</Link>
+        <Button render={<Link href="/library" />} className="mt-4">
+          Back to Library
         </Button>
       </div>
     );
@@ -153,10 +153,8 @@ export default function StudyPage({
     <div className="flex flex-col h-full">
       <div className="border-b p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/library">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+          <Button variant="ghost" size="icon" render={<Link href="/library" />}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{study.name}</h1>
@@ -176,10 +174,8 @@ export default function StudyPage({
             Save
           </Button>
           <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="destructive" size="icon">
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            <DialogTrigger render={<Button variant="destructive" size="icon" />}>
+              <Trash2 className="h-4 w-4" />
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -263,7 +259,7 @@ export default function StudyPage({
               <Label htmlFor="modality">Modality</Label>
               <Select
                 value={modality}
-                onValueChange={(val) => setModality(val as Modality)}
+                onValueChange={(val) => val && setModality(val as Modality)}
               >
                 <SelectTrigger id="modality">
                   <SelectValue />

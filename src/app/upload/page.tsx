@@ -244,7 +244,7 @@ export default function UploadPage() {
                 <Label htmlFor="modality">Modality</Label>
                 <Select
                   value={modality}
-                  onValueChange={(val) => setModality(val as Modality)}
+                  onValueChange={(val) => val && setModality(val as Modality)}
                 >
                   <SelectTrigger id="modality">
                     <SelectValue />
