@@ -157,9 +157,32 @@ export function AnnotationStage({
 
   // Sync back to state if it became invalid to avoid stale references in handlers
   // though we mostly rely on validSelectedTextId for rendering
-  if (selectedTextId !== validSelectedTextId) {
-    setSelectedTextId(validSelectedTextId);
-  }
+  useEffect(() => {
+    if (selectedTextId !== validSelectedTextId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedTextId(validSelectedTextId);
+    }
+  }, [selectedTextId, validSelectedTextId]);
+
+  // Clean up unused textRefs to prevent memory leaks
+  useEffect(() => {
+    const validIds = new Set(annotations.map((a) => a.id));
+    for (const id in textNodeRefs.current) {
+      if (!validIds.has(id)) {
+        delete textNodeRefs.current[id];
+      }
+    }
+  }, [annotations]);
+
+  // Clean up unused textRefs to prevent memory leaks
+  useEffect(() => {
+    const validIds = new Set(annotations.map((a) => a.id));
+    for (const id in textNodeRefs.current) {
+      if (!validIds.has(id)) {
+        delete textNodeRefs.current[id];
+      }
+    }
+  }, [annotations]);
 
   useEffect(() => {
     const transformer = transformerRef.current;
@@ -415,7 +438,7 @@ export function AnnotationStage({
   return (
     <div
       ref={containerRef}
-      className="relative h-full min-h-[400px] w-full overflow-hidden"
+      className="relative h-full min-h-100 w-full overflow-hidden"
     >
       <div className="absolute inset-0">
         <Stage
@@ -579,7 +602,7 @@ export function AnnotationStage({
               cancelTextEditing();
             }
           }}
-          className="absolute z-10 min-h-[2.5rem] min-w-[140px] resize-none rounded-sm border border-white/60 bg-black/70 p-1 text-white outline-none"
+          className="absolute z-10 min-h-10 min-w-35 resize-none rounded-sm border border-white/60 bg-black/70 p-1 text-white outline-none"
           style={{
             left: textInputPos.x,
             top: textInputPos.y,

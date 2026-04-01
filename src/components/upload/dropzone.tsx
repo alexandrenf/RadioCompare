@@ -4,6 +4,8 @@ import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload, ImageIcon } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
 interface ImageDropzoneProps {
   onImageSelect: (file: File, previewUrl: string) => void;
 }
@@ -32,16 +34,14 @@ export function ImageDropzone({ onImageSelect }: ImageDropzoneProps) {
   return (
     <div
       {...getRootProps()}
-      className={`
-        flex flex-col items-center justify-center gap-4 p-12
-        border-2 border-dashed rounded-lg cursor-pointer
-        transition-colors duration-200
-        ${
-          isDragActive
-            ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
-        }
-      `}
+      className={cn(
+        "flex flex-col items-center justify-center gap-4 p-12",
+        "border-2 border-dashed rounded-lg cursor-pointer",
+        "transition-colors duration-200",
+        isDragActive
+          ? "border-primary bg-primary/5"
+          : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
+      )}
     >
       <input {...getInputProps()} aria-label="Upload radiology image" />
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">

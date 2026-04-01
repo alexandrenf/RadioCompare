@@ -201,7 +201,7 @@ export default function UploadPage() {
                 onRedo={annotation.redo}
                 onClear={annotation.clear}
               />
-              <div className="flex-1 min-h-[400px]">
+              <div className="flex-1 min-h-100">
                 <AnnotationStage
                   imageUrl={previewUrl}
                   annotations={annotation.annotations}

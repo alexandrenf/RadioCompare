@@ -181,7 +181,7 @@ export function Toolbar({
             <Label className="text-xs">
               {activeTool === "text" ? "Font Color" : "Stroke Color"}
             </Label>
-            <div className="flex gap-1.5 flex-wrap max-w-[180px]">
+            <div className="flex gap-1.5 flex-wrap max-w-45">
               {COLORS.map((color) => (
                 <button
                   key={color}

@@ -40,7 +40,7 @@ export function SearchBar({
         value={modality}
         onValueChange={(val) => val && onModalityChange(val as Modality | "all")}
       >
-        <SelectTrigger className="w-[140px]" aria-label="Filter by modality">
+        <SelectTrigger className="w-35" aria-label="Filter by modality">
           <SelectValue placeholder="Modality" />
         </SelectTrigger>
         <SelectContent>
