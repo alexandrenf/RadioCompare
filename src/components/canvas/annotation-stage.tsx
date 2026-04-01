@@ -145,35 +145,34 @@ export function AnnotationStage({
     return () => cancelAnimationFrame(frame);
   }, [editingTextId]);
 
-  useEffect(() => {
-    if (activeTool !== "text") {
-      setSelectedTextId(null);
-    }
-  }, [activeTool]);
+  // Ensure selectedTextId is valid based on current state (derived state approach)
+  const validSelectedTextId =
+    activeTool === "text" &&
+    selectedTextId &&
+    annotations.some(
+      (a) => a.tool === "text" && a.id === selectedTextId
+    )
+      ? selectedTextId
+      : null;
 
-  useEffect(() => {
-    if (!selectedTextId) return;
-
-    const annotationExists = annotations.some(
-      (annotation) => annotation.tool === "text" && annotation.id === selectedTextId
-    );
-    if (!annotationExists) {
-      setSelectedTextId(null);
-    }
-  }, [annotations, selectedTextId]);
+  // Sync back to state if it became invalid to avoid stale references in handlers
+  // though we mostly rely on validSelectedTextId for rendering
+  if (selectedTextId !== validSelectedTextId) {
+    setSelectedTextId(validSelectedTextId);
+  }
 
   useEffect(() => {
     const transformer = transformerRef.current;
     if (!transformer) return;
 
     const selectedNode =
-      activeTool === "text" && !editingTextId && selectedTextId
-        ? textNodeRefs.current[selectedTextId] ?? null
+      activeTool === "text" && !editingTextId && validSelectedTextId
+        ? textNodeRefs.current[validSelectedTextId] ?? null
         : null;
 
     transformer.nodes(selectedNode ? [selectedNode] : []);
     transformer.getLayer()?.batchDraw();
-  }, [activeTool, annotations, editingTextId, selectedTextId]);
+  }, [activeTool, annotations, editingTextId, validSelectedTextId]);
 
   const startTextEditing = useCallback(
     (position: { x: number; y: number }, value = "", id: string | null = "new") => {

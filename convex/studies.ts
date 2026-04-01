@@ -129,7 +129,7 @@ export const search = query({
     ),
   },
   handler: async (ctx, args) => {
-    let searchQuery = ctx.db
+    const searchQuery = ctx.db
       .query("studies")
       .withSearchIndex("search_studies", (q) => {
         let sq = q.search("name", args.query);
